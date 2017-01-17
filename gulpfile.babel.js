@@ -7,6 +7,7 @@ import webpackConfig from "./webpack.conf";
 import del from "del";
 import plugins from 'gulp-load-plugins';
 import pump from 'pump';
+import aws from 'aws-sdk';
 
 /* variables */
 const $ = plugins();
@@ -135,4 +136,25 @@ gulp.task('revreplace', ['revision'], () => {
   return gulp.src('dist/index.html')
     .pipe($.revReplace({manifest: manifest}))
     .pipe(gulp.dest('dist'));
+});
+
+
+/* s3 */
+gulp.task('s3', () => {
+  var publisher = plugins.awspublish.create({
+    params: {
+     Bucket: ''
+  },
+  credentials: new AWS.SharedIniFileCredentials({profile: 'default'})
+  });
+  
+  var headers = {
+    'Cache-Control': 'max-age=315360000, no-transform, public'
+  };
+ 
+  return gulp.src('./dist/**/*')
+    .pipe($.awspublish.gzip())
+    .pipe(publisher.publish(headers))
+    .pipe(publisher.cache())
+    .pipe($.awspublish.reporter());
 });
