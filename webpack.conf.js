@@ -29,7 +29,7 @@ export default {
     app: ["./js/app"]
   },
   output: {
-    path: path.join(__dirname, "dist/js"),
+    path: path.join(__dirname, "src/bundle"),
     publicPath: "/",
     filename: "[name].js"
   },

@@ -4,12 +4,36 @@ import BrowserSync from "browser-sync";
 import webpack from "webpack";
 import runSequence from "run-sequence";
 import webpackConfig from "./webpack.conf";
+import del from "del";
 import plugins from 'gulp-load-plugins';
+import pump from 'pump';
 
+/* variables */
 const $ = plugins();
 const browserSync = BrowserSync.create();
 
-gulp.task("js", (cb) => {
+/* work, build, publish */
+gulp.task('default', (cb) => {
+  runSequence('browserSync',
+    cb
+  )
+})
+
+gulp.task('build', (cb) => {
+  runSequence('clean', ['html', 'css', 'js', 'img', 'misc'], 'revreplace',
+    cb
+  )
+})
+
+gulp.task('publish', (cb) => {
+  runSequence('s3',
+    cb
+  )
+})
+
+
+/* webpack for js */
+gulp.task("bundling", (cb) => {
   const myConfig = Object.assign({}, webpackConfig);
 
   webpack(myConfig, (err, stats) => {
@@ -24,10 +48,11 @@ gulp.task("js", (cb) => {
 });
 
 
-gulp.task("server", ["js"], () => {
+/* browser */
+gulp.task("browserSync", ["bundling"], () => {
   browserSync.init({
     server: {
-      baseDir: "./dist"
+      baseDir: "./src"
     }
   });
   gulp.watch('src/sass/**/*.scss', ['sass']);
@@ -36,26 +61,39 @@ gulp.task("server", ["js"], () => {
 });
 
 
+/* html */
 gulp.task('html', () => {
   return gulp.src('src/*.html')
     .pipe($.htmlmin({collapseWhitespace: true}))
     .pipe(gulp.dest('dist/'))
 })
 
+gulp.task('js', (cb) => {
+  pump([
+        gulp.src('src/bundle/*.js'),
+        $.uglify(),
+        gulp.dest('dist/bundle/')
+    ],
+    cb
+  );
+});
+
+/* sass */
 gulp.task("sass", () => {
   return gulp.src('src/sass/**/*')
     .pipe($.sourcemaps.init())
     .pipe($.sass())
     .pipe($.autoprefixer())
     .pipe($.sourcemaps.write('/maps/'))
-    .pipe(gulp.dest('dist/css/'))
+    .pipe(gulp.dest('src/css/'))
     .pipe(browserSync.reload({
       stream: true
     }));
 })
 
+/* css */
 gulp.task('css', () => {
-  return gulp.src('dist/css/**/*')
+  return gulp.src('src/css/**/*')
     .pipe($.cleanCss())
     .pipe(gulp.dest('dist/css/'))
 })
@@ -68,10 +106,17 @@ gulp.task('img', () => {
     .pipe(gulp.dest('dist/img/'))
 })
 
+/* misc */
+gulp.task('misc', function() {
+  return gulp.src('src/misc/**/*')
+    .pipe($.changed('dist/misc'))
+    .pipe(gulp.dest('dist/misc/'))
+})
+
 
 /* cleaning */
 gulp.task('clean', () => {
-  return del.sync(['dist/css/', 'dist/js/']);
+  return del.sync(['dist/css/', 'dist/bundle/']);
 })
 
 /* revving & replacing */
